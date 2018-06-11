@@ -1,4 +1,5 @@
 import sys
+from operator import eq
 import numpy as np
 from keras.preprocessing import image
 from keras.applications import inception_v3
@@ -6,7 +7,7 @@ from keras import backend as K
 from PIL import Image
 
 # parse image's name to predict
-if int(len(sys.argv)) is not 2:
+if int(len(sys.argv)) < 2:
     print("Usage {} : [input_image_name] [ImageNet Object Number]"\
           .format(sys.argv[0]))
     exit()
@@ -19,6 +20,7 @@ if int(len(sys.argv)) is not 3:
     print("    If you want to set other object type,")
     print("    you have to excute this program like following.")
     print("    python {} [ImageNet Object Number]".format(sys.argv[0]))
+
     # default object class : 327 (starfish)
     object_type_to_fake = 327
     object_type_name = "starfish"
@@ -28,8 +30,12 @@ else:
 with open("./imagenet_classes_map.txt", "r") as f:
     lines = f.readlines()
     for line in lines:
-        if line.split(' ')[1] == object_type_to_fake:
-            object_type_name = line.split(' ')[1]
+        line_num = int(line.split(',')[0])
+        line_name = line.split(',')[1][1:]
+        if  line_num == object_type_to_fake:
+            object_type_name = line_name.split('\n')[0]
+            print("[*] Set ImageNet Object to {} : {}".format(object_type_name, object_type_to_fake))
+            break
 
 # Load pre-trained image recognition model
 try:
@@ -95,7 +101,6 @@ cost_function = model_output_layer[0, object_type_to_fake]
 
 # We'll ask Keras to calculate the gradient based on the input image and the currently predicted class
 # In this case, referring to "model_input_layer" will give us back image we are hacking.
-print("[*] Calculating the gradient")
 gradient_function = K.gradients(cost_function, model_input_layer)[0]
 
 
@@ -122,7 +127,6 @@ while cost < 0.80:
     # Ensure that the image doesn't ever change too much to either look funny or to become an invalid image
     hacked_image = np.clip(hacked_image, max_change_below, max_change_above)
     hacked_image = np.clip(hacked_image, -1.0, 1.0)
-
     print("[*] Model's predicted likelihood that the image is a {}: {:.8}%".format(object_type_name, cost * 100))
 
 
@@ -137,7 +141,8 @@ img *= 255.
 # Save the hacked image!
 print("[*] Saving generated image of adversarial example")
 im = Image.fromarray(img.astype(np.uint8))
-im.save("hacked-image.png")
+image_name_to_save = img_name.split('/')[-1]
+im.save(image_name_to_save)
 print("[*] All processing is done!")
-print("    result will be located at ./results/{}".format(img_name.split('/')[-1]))
+print("    result will be located at ./results/{}".format(image_name_to_save))
 
